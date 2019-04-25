@@ -30,8 +30,8 @@ class CART(object):
         self.f = f
         self.random_forest = random_forest
         self.q = q
-        self.seed = seed
-        random.seed(seed)
+        #self.seed = seed
+        #random.seed(seed)
 
     def fit(self, X, y):
         feature_importance = {}
@@ -40,7 +40,7 @@ class CART(object):
             min_samples_leaf=self.min_samples_leaf,
             f=self.f,
             random_forest=self.random_forest,
-            seed=self.seed,
+            #seed=self.seed,
             q=self.q
         )
         split_ind = X.index
@@ -80,7 +80,7 @@ class CART(object):
 
         if len(target_unique) == 1 or self.gain == 0.0:
             # last feature evaluated
-            feature_importance[self.feature] = feature_importance.get(self.feature, self.n_samples)
+            feature_importance[self.feature] = feature_importance.get(self.feature, 0) + self.n_samples
             self.feature = None
             self.label = target_val_cnts.index[0]
             return
@@ -155,7 +155,7 @@ class CART(object):
             min_samples_leaf=self.min_samples_leaf,
             f=self.f,
             random_forest=self.random_forest,
-            seed=self.seed,
+            #seed=self.seed,
             q=self.q
         )
         self.left.depth = self.depth + 1
@@ -174,7 +174,7 @@ class CART(object):
             min_samples_leaf=self.min_samples_leaf,
             f=self.f,
             random_forest=self.random_forest,
-            seed=self.seed,
+            #seed=self.seed,
             q=self.q
         )
         self.right.depth = self.depth + 1

@@ -4,7 +4,7 @@ import numpy as np
 from scipy.stats import mode
 import random
 from MyDecisionTree import CART
-from multiprocessing import Process
+from multiprocess import Process
 from queue import Queue
 
 class MyRandomForest:
@@ -21,7 +21,7 @@ class MyRandomForest:
     # number of trees
     self.nt = nt
     self.seed = seed
-    random.seed(self.seed)
+    #random.seed(self.seed)
   
   def fit(self, X, y):
     n = X.shape[0]
@@ -48,7 +48,7 @@ class MyRandomForest:
       clf.fit(df, labels)
       feature_importance.append(clf.feature_importance)
       models = np.append(models, clf)
-      #print(clf.print_tree())
+      print(clf.print_tree())
       '''
       mp_processes.append(
         Process(target=clf.fit,
@@ -64,7 +64,8 @@ class MyRandomForest:
       clf = q.get()
     '''
     self.models = models
-    self.feature_importance = np.vstack(feature_importance)
+    df_fi = pd.DataFrame(feature_importance).sum(axis=0)
+    self.feature_importance = (df_fi/df_fi.sum()).sort_values(ascending=False)
     return self
 
   def predict(self, X):
