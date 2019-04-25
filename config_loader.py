@@ -10,8 +10,16 @@ def load(config_file, *args):
     if args:
         args = args[0]
     requiredConfig = {
-        'rf': [
-        	   ],
+        'rf': ['dataset_dir',
+               'dataset',
+               'nt',
+               'f',
+               'seed',
+               'test_percentage'
+        ],
+        'tree': ['max_depth',
+                'min_samples_leaf'
+        ]
     }
     try:
         # Load configuration from file
