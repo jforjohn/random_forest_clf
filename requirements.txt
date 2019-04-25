@@ -1,0 +1,9 @@
+scikit-learn>=0.20.0
+sklearn
+numpy
+pandas
+configparser
+scipy
+matplotlib
+seaborn
+multiprocess
