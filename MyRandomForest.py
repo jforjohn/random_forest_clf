@@ -10,7 +10,8 @@ from queue import Queue
 class MyRandomForest:
   def __init__(self,
                f, max_depth,
-               min_samples_leaf, nt
+               min_samples_leaf, nt,
+               seed
               ):
     #self.n_samples = n_samples
     # n_features
@@ -19,14 +20,14 @@ class MyRandomForest:
     self.min_samples_leaf = min_samples_leaf
     # number of trees
     self.nt = nt
-    #self.sklearn_funcs = sklearn_funcs
-
+    self.seed = seed
+    random.seed(self.seed)
   
   def fit(self, X, y):
     n = X.shape[0]
     models = np.array([])
     feature_importance = []
-    mp_processes = []
+    #mp_processes = []
     q = Queue()
     for ind in range(self.nt):
       print('Estimator', ind)
@@ -34,17 +35,20 @@ class MyRandomForest:
       df_bootstap = X.merge(randlist, left_index=True, right_index=True, how='right')
       labels = pd.DataFrame(y).merge(randlist, left_index=True, right_index=True, how='right')
       labels = labels.iloc[:,0]
-      features = random.sample(X.columns.tolist(), self.f)
-      df = df_bootstap[features]
+      #features = random.sample(X.columns.tolist(), self.f)
+      #df = df_bootstap[features]
+      df = df_bootstap
       clf = CART(
-        max_depth = self.max_depth,
-        min_samples_leaf = self.min_samples_leaf,
-        q=q
+        max_depth=self.max_depth,
+        min_samples_leaf=self.min_samples_leaf,
+        f=self.f,
+        random_forest=True,
+        seed=self.seed
       )
       clf.fit(df, labels)
       feature_importance.append(clf.feature_importance)
       models = np.append(models, clf)
-      print(clf.print_tree())
+      #print(clf.print_tree())
       '''
       mp_processes.append(
         Process(target=clf.fit,
