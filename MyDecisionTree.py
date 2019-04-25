@@ -2,9 +2,18 @@ import numpy as np
 from itertools import combinations
 from threading import Thread
 from queue import Queue
+import random
+import sys
 
 class CART(object):
-    def __init__(self, tree = 'cls', criterion = 'gini', prune = 'depth', max_depth = 4, min_criterion = 0.05, min_samples_leaf=2, q=None):
+    def __init__(self,
+                max_depth=4,
+                min_samples_leaf=2,
+                f=1,
+                random_forest=True,
+                q=None,
+                seed=42
+                ):
         self.feature = ''
         self.label = None
         self.n_samples = None
@@ -14,20 +23,28 @@ class CART(object):
         self.threshold = None
         self.feature_type = None
         self.depth = 0
-
         self.root = None
-        self.criterion = criterion
+
         self.min_samples_leaf = min_samples_leaf
-        self.prune = prune
         self.max_depth = max_depth
-        self.min_criterion = min_criterion
-        self.tree = tree
+        self.f = f
+        self.random_forest = random_forest
         self.q = q
+        self.seed = seed
+        random.seed(seed)
 
     def fit(self, X, y):
         feature_importance = {}
-        self.root = CART()
-        self.root._grow_tree(X, y, feature_importance)
+        self.root = CART(
+            max_depth=self.max_depth,
+            min_samples_leaf=self.min_samples_leaf,
+            f=self.f,
+            random_forest=self.random_forest,
+            seed=self.seed,
+            q=self.q
+        )
+        split_ind = X.index
+        self.root._grow_tree(X, y, split_ind, feature_importance)
         #self.root._prune(self.prune, self.max_depth, self.min_criterion, self.root.n_samples)
         self.feature_importance = feature_importance
         #self.q.put(self)
@@ -39,13 +56,19 @@ class CART(object):
     def print_tree(self):
         self.root._show_tree(0, start_cond='if ')
 
-    def _grow_tree(self, data, target, feature_importance):
+    def _grow_tree(self, X, y, split_ind, feature_importance):
         if self.feature is None:
             return
 
+        if self.random_forest:
+            data = X.loc[split_ind, random.sample(X.columns.tolist(), self.f)]
+        else:
+            data = X.loc[split_ind, :]
+
+        target = y.loc[split_ind]
         self.n_samples = data.shape[0]
         #print(data.shape, self.depth)
-        
+    
         target_unique = target.unique()
         target_val_cnts = target.value_counts()
         if self.depth >= self.max_depth or self.n_samples <= self.min_samples_leaf:
@@ -94,19 +117,72 @@ class CART(object):
                 _, best_gain_cat, best_feature_cat, best_threshold_cat = q_element
         #print(th1.is_alve(), th2.is_alive())
 
-        if best_gain_num > best_gain_cat:
-            self.gain = best_gain_num
-            self.feature = best_feature_num
-            self.threshold = best_threshold_num
-            self.feature_type = 'num'
-        else:
+        if best_gain_cat >= best_gain_num and best_feature_cat:
             self.gain = best_gain_cat
             self.feature = best_feature_cat
             self.threshold = best_threshold_cat
             self.feature_type = 'cat'
-        
+        else:
+            self.gain = best_gain_num
+            self.feature = best_feature_num
+            self.threshold = best_threshold_num
+            self.feature_type = 'num'
+
         feature_importance[self.feature] = feature_importance.get(self.feature, self.n_samples)
-        self._split_tree(data, target, feature_importance)
+        #self._split_tree(X, y, data, target, split_ind, feature_importance)
+
+        ## Split the tree
+        #print(self.feature_type, self.feature, self.threshold)
+        if self.feature_type == 'num':
+            features_l = data[data[self.feature] <= self.threshold]
+            #target_l = target[data[self.feature] <= self.threshold]
+
+            features_r = data[data[self.feature] > self.threshold]
+            #target_r = target[data[self.feature] > self.threshold]
+        else:
+            features_l = data[data[self.feature].isin(self.threshold[0])]
+            #target_l = target[data[self.feature].isin(self.threshold[0])]
+
+            features_r = data[data[self.feature].isin(self.threshold[1])]
+            #target_r = target[data[self.feature].isin(self.threshold[1])]
+
+        if features_l.shape[0] == 0:
+            self.feature = None
+            return
+        
+        self.left = CART(
+            max_depth=self.max_depth,
+            min_samples_leaf=self.min_samples_leaf,
+            f=self.f,
+            random_forest=self.random_forest,
+            seed=self.seed,
+            q=self.q
+        )
+        self.left.depth = self.depth + 1
+        self.left.gain = self.gain
+        self.left.feature = self.feature
+        #self.left.label = self.label
+        #print('l', self.gain, self.feature, self.threshold, features_l.shape, data.shape)
+        self.left._grow_tree(X, y, features_l.index, feature_importance)
+
+        if features_r.shape[0] == 0:
+            self.feature = None
+            return
+        
+        self.right = CART(
+            max_depth=self.max_depth,
+            min_samples_leaf=self.min_samples_leaf,
+            f=self.f,
+            random_forest=self.random_forest,
+            seed=self.seed,
+            q=self.q
+        )
+        self.right.depth = self.depth + 1
+        self.right.gain = self.gain
+        self.right.feature = self.feature
+        #self.right.label = self.label
+        #print('r', self.gain, self.feature, self.threshold, features_r.shape, data.shape)
+        self.right._grow_tree(X, y, features_r.index, feature_importance)
 
     def _numerical_split_value(self, data, target, impurity_node, *q):
         if q:
@@ -185,45 +261,6 @@ class CART(object):
         #return best_gain, best_feature, best_threshold
         q.put(('cat', best_gain, best_feature, best_threshold))
         #q.task_done()
-
-    def _split_tree(self, data, target, feature_importance):
-        #print(self.feature_type, self.feature, self.threshold)
-        if self.feature_type == 'num':
-            features_l = data[data[self.feature] <= self.threshold]
-            target_l = target[data[self.feature] <= self.threshold]
-
-            features_r = data[data[self.feature] > self.threshold]
-            target_r = target[data[self.feature] > self.threshold]
-        else:
-            features_l = data[data[self.feature].isin(self.threshold[0])]
-            target_l = target[data[self.feature].isin(self.threshold[0])]
-
-            features_r = data[data[self.feature].isin(self.threshold[1])]
-            target_r = target[data[self.feature].isin(self.threshold[1])]
-
-        self.left = CART()
-        if features_l.shape[0] == 0:
-            self.feature = None
-            self.left.feature = None
-        else:
-            self.left.depth = self.depth + 1
-            self.left.gain = self.gain
-            self.left.feature = self.feature
-            #self.left.label = self.label
-            #print('l', self.gain, self.feature, self.threshold, features_l.shape, data.shape)
-        self.left._grow_tree(features_l, target_l, feature_importance)
-
-        self.right = CART()
-        if features_r.shape[0] == 0:
-            self.feature = None
-            self.right.feature = None
-        else:
-            self.right.depth = self.depth + 1
-            self.right.gain = self.gain
-            self.right.feature = self.feature
-            #self.right.label = self.label
-            #print('r', self.gain, self.feature, self.threshold, features_r.shape, data.shape)
-        self.right._grow_tree(features_r, target_r, feature_importance)
 
     def _calc_impurity(self, target, target_unique, target_val_cnts):
         #if criterion == 'gini':
