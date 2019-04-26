@@ -6,10 +6,11 @@ import matplotlib.pyplot as plt
 
 
 class MyPreprocessing:
-    def __init__(self, raw=False):
+    def __init__(self, one_hot=False):
         pd.set_option('display.max_rows', 500)
         pd.set_option('display.max_columns', 500)
         pd.set_option('display.width', 1000)
+        self.one_hot = one_hot
 
     def fit(self, df):
         # get label
@@ -34,7 +35,7 @@ class MyPreprocessing:
         df_obj = df_obj.fillna('missing42')
         booleanDictionary = {True: 'TRUE', False: 'FALSE'}
         df_obj = df_obj.replace(booleanDictionary)
-        '''
+        if self.one_hot:
             col_2vals = np.array([df_obj[col].unique().size==2 for col in df_obj.columns])
             df_obj_2val = df_obj.iloc[:, col_2vals]
             df_obj_vals = df_obj.iloc[:, ~col_2vals]
@@ -48,14 +49,11 @@ class MyPreprocessing:
             else:
                 df_encoded_vals = pd.get_dummies(df_obj_vals)
 
-            df_encoded = pd.concat(
+            df_obj = pd.concat(
                 [df_encoded_2val, df_encoded_vals],
                 axis=1,
                 sort=False)
 
-        else:
-            df_encoded = pd.DataFrame()
-        '''
         self.new_df = pd.concat(
             [df_num, df_obj], #, labels_fac],
             axis=1,
