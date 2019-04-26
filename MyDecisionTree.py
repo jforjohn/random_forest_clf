@@ -11,7 +11,6 @@ class CART(object):
                 min_samples_leaf=2,
                 f=1,
                 random_forest=True,
-                q=None,
                 seed=42
                 ):
         self.feature = ''
@@ -29,26 +28,27 @@ class CART(object):
         self.max_depth = max_depth
         self.f = f
         self.random_forest = random_forest
-        self.q = q
         #self.seed = seed
         #random.seed(seed)
 
-    def fit(self, X, y):
+    def fit(self, X, y, *q):
         feature_importance = {}
         self.root = CART(
             max_depth=self.max_depth,
             min_samples_leaf=self.min_samples_leaf,
             f=self.f,
             random_forest=self.random_forest,
-            #seed=self.seed,
-            q=self.q
-        )
+            #seed=self.seed
+            )
         split_ind = X.index
         self.root._grow_tree(X, y, split_ind, feature_importance)
         #self.root._prune(self.prune, self.max_depth, self.min_criterion, self.root.n_samples)
         self.feature_importance = feature_importance
-        #self.q.put(self)
-        return self
+        if q:
+            print('Putting in queue')
+            q[0].put(self)
+        else:
+            return self
 
     def predict(self, X):
         return np.array([self.root._predict(row) for _, row in X.iterrows()])
@@ -73,7 +73,7 @@ class CART(object):
         target_val_cnts = target.value_counts()
         if self.depth >= self.max_depth or self.n_samples <= self.min_samples_leaf:
             # last feature evaluated
-            feature_importance[self.feature] = feature_importance.get(self.feature, self.n_samples)
+            feature_importance[self.feature] = feature_importance.get(self.feature, 0) + self.n_samples
             self.feature = None
             self.label = target_val_cnts.index[0]
             return
@@ -117,6 +117,11 @@ class CART(object):
                 _, best_gain_cat, best_feature_cat, best_threshold_cat = q_element
         #print(th1.is_alve(), th2.is_alive())
 
+        # Extreme case handle
+        if best_feature_cat is None and best_feature_num is None:
+            self.feature = None
+            return
+
         if best_gain_cat >= best_gain_num and best_feature_cat:
             self.gain = best_gain_cat
             self.feature = best_feature_cat
@@ -128,11 +133,11 @@ class CART(object):
             self.threshold = best_threshold_num
             self.feature_type = 'num'
 
-        feature_importance[self.feature] = feature_importance.get(self.feature, self.n_samples)
+        feature_importance[self.feature] = feature_importance.get(self.feature,0) + self.n_samples
         #self._split_tree(X, y, data, target, split_ind, feature_importance)
 
         ## Split the tree
-        #print(self.feature_type, self.feature, self.threshold)
+        print(2,self.feature_type, self.threshold, self.gain, self.depth, data.shape, data.columns)
         if self.feature_type == 'num':
             features_l = data[data[self.feature] <= self.threshold]
             #target_l = target[data[self.feature] <= self.threshold]
@@ -155,8 +160,7 @@ class CART(object):
             min_samples_leaf=self.min_samples_leaf,
             f=self.f,
             random_forest=self.random_forest,
-            #seed=self.seed,
-            q=self.q
+            #seed=self.seed
         )
         self.left.depth = self.depth + 1
         self.left.gain = self.gain
@@ -174,8 +178,7 @@ class CART(object):
             min_samples_leaf=self.min_samples_leaf,
             f=self.f,
             random_forest=self.random_forest,
-            #seed=self.seed,
-            q=self.q
+            #seed=self.seed
         )
         self.right.depth = self.depth + 1
         self.right.gain = self.gain
@@ -191,7 +194,11 @@ class CART(object):
         for col in data.columns: #range(data.shape[1]):
 
             feature_level = data[col].unique()
-            thresholds = (feature_level[:-1] + feature_level[1:]) / 2.0
+            if len(feature_level) > 1:
+                thresholds = (feature_level[:-1] + feature_level[1:]) / 2.0
+            else:
+                thresholds = feature_level
+            print(1,data.shape, thresholds, feature_level)
 
             for threshold in thresholds:
                 target_l = target[data[col] <= threshold]
