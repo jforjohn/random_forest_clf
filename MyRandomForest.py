@@ -28,7 +28,7 @@ class MyRandomForest:
     models = np.array([])
     feature_importance = []
     #mp_processes = []
-    q = Queue()
+    #q = Queue()
     for ind in range(self.nt):
       print('Estimator', ind)
       randlist = pd.DataFrame(index=random.sample(X.index.tolist(),n))
@@ -49,23 +49,10 @@ class MyRandomForest:
       feature_importance.append(clf.feature_importance)
       models = np.append(models, clf)
       print(clf.print_tree())
-      '''
-      mp_processes.append(
-        Process(target=clf.fit,
-                   args=(df, labels))
-      )
-    for p in mp_processes:
-      p.start()
 
-    for p in mp_processes:
-      p.join()
-    
-    for p in mp_processes:
-      clf = q.get()
-    '''
     self.models = models
     df_fi = pd.DataFrame(feature_importance).sum(axis=0)
-    self.feature_importance = (df_fi/df_fi.sum()).sort_values(ascending=False)
+    self.feature_importance = round((df_fi/df_fi.sum()).sort_values(ascending=False)*100, 2)
     return self
 
   def predict(self, X):
